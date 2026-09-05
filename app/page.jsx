@@ -311,6 +311,21 @@ export default function Home() {
         totalQuantity: value,
       });
       setBatch(updated);
+      // The report's "Sales Quantity" row is a snapshot taken when the
+      // report was last loaded, not read live from the batch - patch it
+      // in place so it reflects the new value immediately instead of
+      // waiting for the next full report reload.
+      setReport((prev) =>
+        prev
+          ? {
+              ...prev,
+              vouchers: {
+                ...prev.vouchers,
+                totalQuantity: updated.totalQuantity,
+              },
+            }
+          : prev,
+      );
     } finally {
       setSavingQuantity(false);
     }

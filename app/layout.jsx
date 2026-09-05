@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Payment Tracker",
+  title: "Payman - Accounting Web App",
   description: "Daily voucher and payment tracking",
 };
 

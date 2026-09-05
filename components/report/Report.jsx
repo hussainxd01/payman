@@ -627,7 +627,7 @@ export default function Report({
                 outstanding.map((v) => (
                   <Row
                     key={v._id}
-                    label={v.partyName}
+                    label={`${v.voucherNumber} — ${v.partyName}`}
                     value={formatCurrency(v.outstanding)}
                   />
                 ))
