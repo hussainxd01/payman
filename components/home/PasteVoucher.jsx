@@ -4,7 +4,12 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
 
-export default function PasteVoucher({ voucherCount, onParse, onResetAll }) {
+export default function PasteVoucher({
+  voucherCount,
+  onParse,
+  onResetAll,
+  onViewVouchers,
+}) {
   const [text, setText] = useState("");
   const [parsing, setParsing] = useState(false);
 
@@ -45,6 +50,14 @@ export default function PasteVoucher({ voucherCount, onParse, onResetAll }) {
             {parsing ? "Processing..." : "Start Processing"}
           </Button>
         </div>
+
+        {voucherCount > 0 && onViewVouchers && (
+          <div className="mt-8 flex justify-center">
+            <Button variant="secondary" onClick={onViewVouchers}>
+              View {voucherCount} Voucher{voucherCount === 1 ? "" : "s"}
+            </Button>
+          </div>
+        )}
 
         <div className="mt-10 flex items-center justify-center gap-4">
           <p className="text-center text-xs text-muted uppercase tracking-widest">

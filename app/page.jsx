@@ -383,6 +383,7 @@ export default function Home() {
           voucherCount={vouchers.length}
           onParse={handleParse}
           onResetAll={vouchers.length > 0 ? () => setDeleteAllOpen(true) : null}
+          onViewVouchers={vouchers.length > 0 ? () => setView("list") : null}
         />
       )}
 
