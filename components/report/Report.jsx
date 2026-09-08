@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Printer } from "lucide-react";
+import { Printer, FileDown, Mail } from "lucide-react";
 import Button from "@/components/ui/Button";
 import NumberInput from "@/components/ui/NumberInput";
 import { formatCurrency } from "@/components/ui/Shared";
@@ -77,6 +77,81 @@ export default function Report({
   const expenseList = expenses || [];
 
   const quantityDirty = quantityDraft !== totalQuantity;
+
+  const reportDateLabel = formatDate(batch?.date) || "Today";
+
+  // Reuses the browser's own print dialog (where "Save as PDF" is a
+  // destination option) rather than a client-side PDF library - this
+  // keeps full fidelity with the print CSS below instead of risking a
+  // library mangling the grid/print layout. Setting document.title
+  // first just gives the save dialog a sensible default filename.
+  const handleSavePdf = () => {
+    const previousTitle = document.title;
+    document.title = `Payment Collection Report ${reportDateLabel}`.replace(
+      /\//g,
+      "-",
+    );
+
+    const restore = () => {
+      document.title = previousTitle;
+      window.removeEventListener("afterprint", restore);
+    };
+    window.addEventListener("afterprint", restore);
+
+    window.print();
+  };
+
+  // A mailto: link can't carry a file attachment (no browser allows
+  // that, for security reasons) - so this opens the person's email app
+  // with a plain-text summary pre-filled. For the exact formatted
+  // report, use Save as PDF first and attach that file manually.
+  const handleEmailReport = () => {
+    const subject = `Payment Collection Report - ${reportDateLabel}`;
+
+    const outstandingPreview = outstanding.slice(0, 15);
+    const outstandingExtra = outstanding.length - outstandingPreview.length;
+
+    const lines = [
+      "PAYMENT COLLECTION REPORT",
+      `Report Date: ${reportDateLabel}`,
+      `Report Time: ${formatTime(generatedAt)}`,
+      "",
+      "SUMMARY",
+      `Vouchers: ${summary.totalVouchers}`,
+      `Gross Sale: ${formatCurrency(summary.totalAmount)}`,
+      `Cash Receipts: ${formatCurrency(summary.cash)}`,
+      `Bank Receipts: ${formatCurrency(summary.totalBank)}`,
+      `Total Received: ${formatCurrency(summary.totalPaid)}`,
+      `Goods Return: ${formatCurrency(summary.totalGoodsReturn)}`,
+      `Discount Allowed: ${formatCurrency(summary.totalDiscount)}`,
+      `Outstanding: ${formatCurrency(summary.totalOutstanding)}`,
+      `Sales Quantity: ${summary.totalQuantity}`,
+      "",
+      "EXPENSES",
+      `Total Expenses: ${formatCurrency(expenseTotals.totalExpenses)}`,
+      `Net: ${formatCurrency(net.net)}`,
+    ];
+
+    if (outstanding.length > 0) {
+      lines.push("", `OUTSTANDING (${outstanding.length})`);
+      outstandingPreview.forEach((v) => {
+        lines.push(
+          `${v.voucherNumber} - ${v.partyName}: ${formatCurrency(v.outstanding)}`,
+        );
+      });
+      if (outstandingExtra > 0) {
+        lines.push(`...and ${outstandingExtra} more`);
+      }
+    }
+
+    lines.push(
+      "",
+      '(This is a text summary - mailto links can\'t carry attachments. For the full formatted report, use "Save as PDF" and attach that file here.)',
+    );
+
+    const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
+    window.location.href = mailtoUrl;
+  };
 
   return (
     <div className="min-h-screen px-6 py-10 font-mono report-page">
@@ -485,23 +560,31 @@ export default function Report({
             Report
           </p>
 
-          <button
-            onClick={() => window.print()}
-            className="
-              flex
-              items-center
-              gap-2
-              text-xs
-              uppercase
-              tracking-widest
-              text-muted
-              hover:text-ink
-              transition-colors
-            "
-          >
-            <Printer size={14} />
-            Print
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleEmailReport}
+              className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted hover:text-ink transition-colors"
+            >
+              <Mail size={14} />
+              Email
+            </button>
+
+            <button
+              onClick={handleSavePdf}
+              className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted hover:text-ink transition-colors"
+            >
+              <FileDown size={14} />
+              Save PDF
+            </button>
+
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted hover:text-ink transition-colors"
+            >
+              <Printer size={14} />
+              Print
+            </button>
+          </div>
         </div>
 
         {/* =================================================

@@ -1,9 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
-    "./app/**/*.{js,jsx}",
-    "./components/**/*.{js,jsx}",
-  ],
+  content: ["./app/**/*.{js,jsx}", "./components/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
@@ -15,6 +12,8 @@ module.exports = {
       fontFamily: {
         sans: [
           "Helvetica Neue",
+          "Helvetica",
+          "var(--font-sans)",
           "Arial",
           "-apple-system",
           "BlinkMacSystemFont",
