@@ -50,6 +50,7 @@ export default function OutstandingPage({ vouchers, onBack, onOpenVoucher }) {
                 value={search}
                 onChange={setSearch}
                 placeholder="Search vouchers..."
+                autoFocus
               />
             </div>
           )}
