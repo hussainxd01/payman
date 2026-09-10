@@ -31,11 +31,6 @@ export default function Home() {
   const [addMoreReturnView, setAddMoreReturnView] = useState(null);
   const [processingIndex, setProcessingIndex] = useState(0);
   const [editingVoucher, setEditingVoucher] = useState(null);
-  // A snapshot of the outstanding list taken when the Outstanding page is
-  // opened. While this is set, saving a voucher opens the next one in
-  // THIS list instead of bouncing to the report or all-vouchers.
-  const [outstandingQueue, setOutstandingQueue] = useState(null);
-
   const [saving, setSaving] = useState(false);
   const [savingQuantity, setSavingQuantity] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -177,20 +172,10 @@ export default function Home() {
   const handleSaveProcessing = async (data, opts) => {
     setSaving(true);
     setError("");
-    const wasQueued = !!outstandingQueue;
     try {
       const current = vouchers[processingIndex];
       await api.updateVoucher(batch._id, current._id, data);
       const updated = await refreshVouchers();
-
-      if (opts?.advance && wasQueued) {
-        const continued = continueOutstandingQueue(current._id, updated);
-        if (!continued) {
-          await loadReport(batch._id);
-          setView("outstanding");
-        }
-        return;
-      }
 
       const isLast = processingIndex >= updated.length - 1;
       if (opts?.advance && !isLast) {
@@ -204,11 +189,6 @@ export default function Home() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handlePreviousProcessing = () => {
-    setError("");
-    setProcessingIndex((i) => Math.max(0, i - 1));
   };
 
   // ---- Report ----
@@ -230,35 +210,7 @@ export default function Home() {
   };
 
   const goToOutstanding = () => {
-    setOutstandingQueue(report?.vouchers?.outstandingVouchers || []);
     setView("outstanding");
-  };
-
-  // If we're mid-review of the outstanding list (see goToOutstanding),
-  // opens the next voucher after the one just saved. Returns false when
-  // there's no next one (or we weren't in that flow at all), so the
-  // caller can fall back to its normal navigation.
-  const continueOutstandingQueue = (currentVoucherId, updatedVouchers) => {
-    if (!outstandingQueue) return false;
-    const idx = outstandingQueue.findIndex((v) => v._id === currentVoucherId);
-    const nextItem = idx >= 0 ? outstandingQueue[idx + 1] : undefined;
-    if (!nextItem) {
-      setOutstandingQueue(null);
-      return false;
-    }
-    const full = updatedVouchers.find((v) => v._id === nextItem._id);
-    if (!full) {
-      setOutstandingQueue(null);
-      return false;
-    }
-    setError("");
-    if (!full.isProcessed) {
-      openVoucherForProcessing(full);
-    } else {
-      setEditingVoucher(full);
-      setView("edit-voucher");
-    }
-    return true;
   };
 
   // Opens a voucher for editing. If it hasn't been processed yet, route it
@@ -290,23 +242,31 @@ export default function Home() {
     setView("edit-voucher");
   };
 
+  const openVoucherForEditFromOutstanding = async (voucherSummary) => {
+    const updated = await refreshVouchers();
+    const full =
+      updated.find((v) => v._id === voucherSummary._id) || voucherSummary;
+    if (!full.isProcessed) {
+      openVoucherForProcessing(full);
+      return;
+    }
+    setEditingVoucher({ ...full, _editReturnView: "outstanding" });
+    setError("");
+    setView("edit-voucher");
+  };
+
   const handleSaveEdit = async (data) => {
     setSaving(true);
     setError("");
-    const wasQueued = !!outstandingQueue;
     try {
       const savedId = editingVoucher._id;
-      const updated = await api
-        .updateVoucher(batch._id, savedId, data)
-        .then(() => refreshVouchers());
+      await api.updateVoucher(batch._id, savedId, data);
+      await refreshVouchers();
       await refreshReport();
-      const continued = wasQueued
-        ? continueOutstandingQueue(savedId, updated)
-        : false;
-      if (!continued) {
-        setEditingVoucher(null);
-        setView(wasQueued ? "outstanding" : "report");
-      }
+
+      const returnView = editingVoucher._editReturnView;
+      setEditingVoucher(null);
+      setView(returnView || "report");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -393,7 +353,6 @@ export default function Home() {
       setReport(null);
       setExpenses([]);
       setParsed(null);
-      setOutstandingQueue(null);
       setResetOpen(false);
       setView("home");
     } finally {
@@ -409,7 +368,6 @@ export default function Home() {
       }
       setVouchers([]);
       setReport(null);
-      setOutstandingQueue(null);
       setDeleteAllOpen(false);
       setView("home");
     } finally {
@@ -565,7 +523,6 @@ export default function Home() {
           onSave={handleSaveProcessing}
           onPrevious={handlePreviousProcessing}
           onBack={() => {
-            setOutstandingQueue(null);
             setView("list");
           }}
           saving={saving}
@@ -592,7 +549,7 @@ export default function Home() {
         <OutstandingPage
           vouchers={report.vouchers.outstandingVouchers}
           onBack={() => setView("report")}
-          onOpenVoucher={openVoucherForEditFromReport}
+          onOpenVoucher={openVoucherForEditFromOutstanding}
         />
       )}
 
@@ -618,9 +575,9 @@ export default function Home() {
           onDeleteBank={handleDeleteBank}
           onSave={handleSaveEdit}
           onBack={() => {
-            setOutstandingQueue(null);
+            const returnView = editingVoucher._editReturnView;
             setEditingVoucher(null);
-            setView("all-vouchers");
+            setView(returnView || "all-vouchers");
           }}
           saving={saving}
           error={error}
