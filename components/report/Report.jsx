@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Printer, FileDown, Mail } from "lucide-react";
+import { Printer, FileDown, Mail, X } from "lucide-react";
 import Button from "@/components/ui/Button";
 import NumberInput from "@/components/ui/NumberInput";
 import { formatCurrency } from "@/components/ui/Shared";
@@ -62,6 +62,12 @@ export default function Report({
   const [quantityDraft, setQuantityDraft] = useState(totalQuantity);
   const [generatedAt] = useState(() => new Date());
 
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailSent, setEmailSent] = useState(false);
+
   useEffect(() => {
     setQuantityDraft(totalQuantity);
   }, [totalQuantity]);
@@ -79,6 +85,49 @@ export default function Report({
   const quantityDirty = quantityDraft !== totalQuantity;
 
   const reportDateLabel = formatDate(batch?.date) || "Today";
+
+  const buildSummaryText = () => {
+    const outstandingPreview = outstanding.slice(0, 15);
+    const outstandingExtra = outstanding.length - outstandingPreview.length;
+
+    const lines = [
+      "PAYMENT COLLECTION REPORT",
+      `Report Date: ${reportDateLabel}`,
+      `Report Time: ${formatTime(generatedAt)}`,
+
+      "",
+      "SUMMARY",
+      `Vouchers: ${summary.totalVouchers}`,
+      `Gross Sale: ${formatCurrency(summary.totalAmount)}`,
+      `Cash Receipts: ${formatCurrency(summary.cash)}`,
+      `Bank Receipts: ${formatCurrency(summary.totalBank)}`,
+      `Total Received: ${formatCurrency(summary.totalPaid)}`,
+      `Goods Return: ${formatCurrency(summary.totalGoodsReturn)}`,
+      `Discount Allowed: ${formatCurrency(summary.totalDiscount)}`,
+      `Outstanding: ${formatCurrency(summary.totalOutstanding)}`,
+      `Sales Quantity: ${summary.totalQuantity}`,
+
+      "",
+      "EXPENSES",
+      `Total Expenses: ${formatCurrency(expenseTotals.totalExpenses)}`,
+      `Net: ${formatCurrency(net.net)}`,
+    ];
+
+    if (outstanding.length > 0) {
+      lines.push("", `OUTSTANDING (${outstanding.length})`);
+      outstandingPreview.forEach((v) => {
+        lines.push(
+          `${v.voucherNumber} - ${v.partyName}: ${formatCurrency(v.outstanding)}`,
+        );
+      });
+
+      if (outstandingExtra > 0) {
+        lines.push(`...and ${outstandingExtra} more`);
+      }
+    }
+
+    return lines.join("\n");
+  };
 
   // Reuses the browser's own print dialog (where "Save as PDF" is a
   // destination option) rather than a client-side PDF library - this
@@ -101,56 +150,49 @@ export default function Report({
     window.print();
   };
 
-  // A mailto: link can't carry a file attachment (no browser allows
-  // that, for security reasons) - so this opens the person's email app
-  // with a plain-text summary pre-filled. For the exact formatted
-  // report, use Save as PDF first and attach that file manually.
-  const handleEmailReport = () => {
-    const subject = `Payment Collection Report - ${reportDateLabel}`;
+  // Generates an actual PDF file client-side (no server/headless
+  // browser available for a true print-to-PDF conversion), so this
+  // rasterizes the report and lays it into A4-landscape pages. It's a
+  // very close visual match to what's on screen, but text is embedded
+  // as an image rather than selectable vector text like a native print
+  // export - a known tradeoff of doing this without server infra.
+  // windowWidth forces html2canvas to lay the page out at desktop width
+  // even if you're on a phone, so the emailed PDF always looks like the
+  // full landscape report rather than the mobile single-column view.
 
-    const outstandingPreview = outstanding.slice(0, 15);
-    const outstandingExtra = outstanding.length - outstandingPreview.length;
-
-    const lines = [
-      "PAYMENT COLLECTION REPORT",
-      `Report Date: ${reportDateLabel}`,
-      `Report Time: ${formatTime(generatedAt)}`,
-      "",
-      "SUMMARY",
-      `Vouchers: ${summary.totalVouchers}`,
-      `Gross Sale: ${formatCurrency(summary.totalAmount)}`,
-      `Cash Receipts: ${formatCurrency(summary.cash)}`,
-      `Bank Receipts: ${formatCurrency(summary.totalBank)}`,
-      `Total Received: ${formatCurrency(summary.totalPaid)}`,
-      `Goods Return: ${formatCurrency(summary.totalGoodsReturn)}`,
-      `Discount Allowed: ${formatCurrency(summary.totalDiscount)}`,
-      `Outstanding: ${formatCurrency(summary.totalOutstanding)}`,
-      `Sales Quantity: ${summary.totalQuantity}`,
-      "",
-      "EXPENSES",
-      `Total Expenses: ${formatCurrency(expenseTotals.totalExpenses)}`,
-      `Net: ${formatCurrency(net.net)}`,
-    ];
-
-    if (outstanding.length > 0) {
-      lines.push("", `OUTSTANDING (${outstanding.length})`);
-      outstandingPreview.forEach((v) => {
-        lines.push(
-          `${v.voucherNumber} - ${v.partyName}: ${formatCurrency(v.outstanding)}`,
-        );
-      });
-      if (outstandingExtra > 0) {
-        lines.push(`...and ${outstandingExtra} more`);
-      }
+  const handleSendEmail = async () => {
+    if (!emailTo.trim()) {
+      setEmailError("Enter a recipient email address.");
+      return;
     }
 
-    lines.push(
-      "",
-      '(This is a text summary - mailto links can\'t carry attachments. For the full formatted report, use "Save as PDF" and attach that file here.)',
-    );
+    setSendingEmail(true);
+    setEmailError("");
+    setEmailSent(false);
 
-    const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
-    window.location.href = mailtoUrl;
+    try {
+      const res = await fetch("/api/email-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: emailTo.trim(),
+          subject: `Payment Collection Report - ${reportDateLabel}`,
+          text: buildSummaryText(),
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || "Failed to send email.");
+      }
+
+      setEmailSent(true);
+    } catch (err) {
+      setEmailError(err.message || "Failed to send email.");
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   return (
@@ -339,6 +381,73 @@ export default function Report({
           font-size: 13px;
 
           color: #111;
+        }
+
+        /* =====================================================
+           MOBILE / SMALL SCREENS (on-screen viewing only - the
+           print/PDF output above always stays A4 landscape
+           regardless of what device triggered it)
+        ===================================================== */
+
+        @media screen and (max-width: 768px) {
+          .report-page {
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+            padding-top: 20px !important;
+          }
+
+          .report-container {
+            padding: 22px 18px !important;
+            box-shadow: none !important;
+            border: 1px solid #e5e5e5;
+          }
+
+          .report-header-title {
+            font-size: 17px !important;
+            letter-spacing: 0.05em !important;
+          }
+
+          .report-meta {
+            font-size: 12px !important;
+          }
+
+          .report-divider {
+            margin-top: 12px !important;
+            margin-bottom: 16px !important;
+          }
+
+          .print-grid {
+            grid-template-columns: 1fr !important;
+            gap: 28px !important;
+          }
+
+          .paper-section {
+            margin-bottom: 18px !important;
+          }
+
+          .paper-section-title {
+            font-size: 12.5px !important;
+          }
+
+          .paper-row {
+            font-size: 12.5px !important;
+            gap: 10px !important;
+            min-height: 24px !important;
+          }
+        }
+
+        @media screen and (max-width: 420px) {
+          .report-container {
+            padding: 18px 14px !important;
+          }
+
+          .report-header-title {
+            font-size: 15px !important;
+          }
+
+          .paper-row {
+            font-size: 12px !important;
+          }
         }
 
         /* =====================================================
@@ -555,14 +664,18 @@ export default function Report({
             TOP TOOLBAR
         ================================================= */}
 
-        <div className="flex items-center justify-between mb-6 no-print">
+        <div className="flex items-center justify-between gap-3 mb-6 no-print flex-wrap">
           <p className="text-[11px] uppercase tracking-[0.3em] text-muted">
             Report
           </p>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <button
-              onClick={handleEmailReport}
+              onClick={() => {
+                setEmailOpen((o) => !o);
+                setEmailError("");
+                setEmailSent(false);
+              }}
               className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted hover:text-ink transition-colors"
             >
               <Mail size={14} />
@@ -586,6 +699,47 @@ export default function Report({
             </button>
           </div>
         </div>
+
+        {emailOpen && (
+          <div className="mb-6 no-print font-sans rounded-lg border border-line bg-white p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] uppercase tracking-widest text-muted">
+                Email this report
+              </p>
+              <button
+                onClick={() => setEmailOpen(false)}
+                aria-label="Close"
+                className="text-muted hover:text-ink transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="email"
+                value={emailTo}
+                onChange={(e) => {
+                  setEmailTo(e.target.value);
+                  setEmailError("");
+                  setEmailSent(false);
+                }}
+                placeholder="recipient@example.com"
+                className="flex-1 border border-line px-3 py-2 text-sm text-ink focus:outline-none focus:border-ink transition-colors"
+              />
+              <Button onClick={handleSendEmail} disabled={sendingEmail}>
+                {sendingEmail ? "Sending..." : "Send"}
+              </Button>
+            </div>
+            {emailError && (
+              <p className="mt-2 text-xs text-red-700">{emailError}</p>
+            )}
+            {emailSent && (
+              <p className="mt-2 text-xs text-emerald-700">
+                Sent to {emailTo}.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* =================================================
             REPORT HEADER
