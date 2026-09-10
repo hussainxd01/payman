@@ -10,15 +10,7 @@ module.exports = {
         paper: "#F7F7F5",
       },
       fontFamily: {
-        sans: [
-          "Helvetica Neue",
-          "Helvetica",
-          "var(--font-sans)",
-          "Arial",
-          "-apple-system",
-          "BlinkMacSystemFont",
-          "sans-serif",
-        ],
+        sans: ["var(--font-sans)"],
       },
     },
   },

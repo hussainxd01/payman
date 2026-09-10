@@ -419,7 +419,93 @@ export default function Home() {
 
   // ---- Render ----
   if (view === "loading") {
-    return <LoadingState label="Loading workspace..." />;
+    return (
+      <div className="min-h-screen bg-[#f3f0e8] text-[#111111] font-sans">
+        <div className="min-h-screen flex flex-col">
+          {/* Header */}
+          <header className="h-16 border-b border-black/15 px-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 flex items-center justify-center overflow-hidden">
+                <img
+                  src="/logo.png"
+                  alt="Payment Tracker"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+
+              <div>
+                <div className="text-[13px] font-black uppercase tracking-[-0.02em]">
+                  Payment Tracker
+                </div>
+                <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-black/45">
+                  Daily workspace
+                </div>
+              </div>
+            </div>
+
+            <span className="text-[10px] uppercase tracking-[0.2em] text-black/45">
+              Workspace
+            </span>
+          </header>
+
+          {/* Main */}
+          <main className="flex-1 flex items-center justify-center px-6">
+            <div className="w-full max-w-xl">
+              {/* Status label */}
+              <div className="flex items-center gap-3 mb-5">
+                <span className="w-2 h-2 bg-[#111111] animate-pulse" />
+                <span className="text-[11px] uppercase tracking-[0.18em] text-black/55">
+                  Initializing
+                </span>
+              </div>
+
+              {/* Main loading block */}
+              <div className="border border-black bg-white">
+                <div className="px-6 py-5 border-b border-black/15 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider">
+                    Loading workspace
+                  </span>
+
+                  <span className="text-[11px] text-black/40">Please wait</span>
+                </div>
+
+                <div className="px-6 py-8">
+                  <h1 className="text-4xl sm:text-5xl font-black tracking-[-0.04em] leading-none">
+                    Getting things
+                    <br />
+                    <span className="inline-block bg-[#fff06a] px-2 py-1 mt-2">
+                      ready.
+                    </span>
+                  </h1>
+
+                  <p className="mt-6 text-sm text-black/50 max-w-sm leading-relaxed">
+                    Preparing your vouchers, payments and workspace.
+                  </p>
+
+                  {/* Progress line */}
+                  <div className="mt-10">
+                    <div className="h-[2px] bg-black/10 overflow-hidden">
+                      <div className="h-full w-1/3 bg-black animate-[loading_1.4s_ease-in-out_infinite]" />
+                    </div>
+
+                    <div className="mt-3 flex justify-between text-[10px] uppercase tracking-[0.15em] text-black/40">
+                      <span>Loading</span>
+                      <span>01 / 01</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tiny footer */}
+              <div className="mt-4 flex justify-between text-[10px] uppercase tracking-[0.15em] text-black/30">
+                <span>Payment Tracker</span>
+                <span>Secure workspace</span>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -85,7 +85,10 @@ export default function VoucherEditor({
   };
 
   const removeBank = (i) => {
-    setForm((f) => ({ ...f, banks: f.banks.filter((_, idx) => idx !== i) }));
+    setForm((f) => ({
+      ...f,
+      banks: f.banks.filter((_, idx) => idx !== i),
+    }));
   };
 
   // Called when the searchable bank field commits (Enter or a click).
@@ -99,7 +102,9 @@ export default function VoucherEditor({
     const existing = (banks || []).find(
       (b) => b.name.toLowerCase() === name.toLowerCase(),
     );
+
     const finalName = existing ? existing.name : name;
+
     if (!existing) {
       await onAddBank(name);
     }
@@ -108,17 +113,27 @@ export default function VoucherEditor({
       const idx = f.banks.findIndex(
         (b) => b.bankName.toLowerCase() === finalName.toLowerCase(),
       );
+
       if (idx >= 0) {
         const next = [...f.banks];
+
         next[idx] = {
           ...next[idx],
           amount: (Number(next[idx].amount) || 0) + (addAmount || 0),
         };
+
         return { ...f, banks: next };
       }
+
       return {
         ...f,
-        banks: [...f.banks, { bankName: finalName, amount: addAmount || 0 }],
+        banks: [
+          ...f.banks,
+          {
+            bankName: finalName,
+            amount: addAmount || 0,
+          },
+        ],
       };
     });
 
@@ -135,7 +150,9 @@ export default function VoucherEditor({
 
   const handleConfirmDeleteBank = async () => {
     if (!bankPendingDelete) return;
+
     setDeletingBank(true);
+
     try {
       await onDeleteBank(bankPendingDelete);
       setBankPendingDelete(null);
@@ -162,11 +179,14 @@ export default function VoucherEditor({
     goodsReturn: form.goodsReturn,
     payments: { cash: form.cash, banks: form.banks },
   };
+
   const paidTotal = calculateVoucherPaidTotal(previewVoucher);
+
   // Outstanding (never negative - what's still owed, or 0). Used for the
   // Mark as Outstanding button/shortcut, which only makes sense while
   // something is still owed.
   const outstanding = calculateVoucherOutstanding(previewVoucher);
+
   // Raw balance (can go negative) - what the balance box shows, so
   // overpaying a voucher is visible as a negative number instead of
   // silently flooring at 0.
@@ -178,21 +198,25 @@ export default function VoucherEditor({
 
   const isOverpaid = rawBalance < 0;
   const isFullyPaid = rawBalance === 0;
+
   const balanceBoxClass = isOverpaid
     ? "bg-red-50 border-red-200"
     : isFullyPaid
       ? "bg-emerald-50 border-emerald-200"
-      : "bg-slate-50 border-line";
+      : "bg-[#fffbdc] border-black/15";
+
   const balanceTextClass = isOverpaid
     ? "text-red-700"
     : isFullyPaid
       ? "text-emerald-700"
-      : "text-ink";
+      : "text-[#111]";
+
   const BalanceIcon = isOverpaid
     ? AlertCircle
     : isFullyPaid
       ? CheckCircle2
       : Wallet;
+
   const balanceLabel = isOverpaid
     ? "Overpaid"
     : isFullyPaid
@@ -214,6 +238,7 @@ export default function VoucherEditor({
 
   const handleMarkOutstanding = async () => {
     if (outstanding <= 0) return;
+
     await onSave(buildSaveData({ markedOutstanding: true }), {
       advance: mode === "process",
     });
@@ -238,227 +263,343 @@ export default function VoucherEditor({
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (document.activeElement === addBankNameRef.current) return;
       if (saving || outstanding <= 0) return;
+
       e.preventDefault();
       handleMarkOutstanding();
     };
+
     window.addEventListener("keydown", handleWindowKeyDown);
+
     return () => window.removeEventListener("keydown", handleWindowKeyDown);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, saving, outstanding]);
 
   const progressPct = total > 0 ? ((index + 1) / total) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-paper flex justify-center px-4 py-6">
-      <div className="w-full max-w-md">
-        {/* Top bar: back link + step counter */}
-        <div className="flex items-center justify-between mb-2">
+    <div className="min-h-screen bg-[#f3f0e8] text-[#111]">
+      {/* =========================================================
+          HEADER
+      ========================================================== */}
+
+      {/* =========================================================
+          MAIN
+      ========================================================== */}
+      <main className="mx-auto w-full max-w-2xl px-6 py-8 sm:py-10">
+        {/* Back + progress */}
+        <div className="mb-3 flex items-center justify-between">
           {onBack ? (
             <button
               onClick={onBack}
-              className="flex items-center gap-1 text-xs font-medium text-muted hover:text-ink transition-colors"
+              className="
+                flex
+                items-center
+                gap-1
+                text-[9px]
+                font-medium
+                uppercase
+                tracking-[0.17em]
+                text-black/45
+                transition-colors
+                hover:text-black
+              "
             >
-              <ChevronLeft size={14} />
+              <ChevronLeft size={13} />
               {mode === "edit" ? "All Vouchers" : "Vouchers"}
             </button>
           ) : (
             <span />
           )}
+
           {mode === "process" && total > 0 && (
-            <span className="text-[11px] font-medium text-muted tabular-nums">
+            <span className="font-mono text-[9px] text-black/40 tabular-nums">
               {index + 1} / {total}
             </span>
           )}
         </div>
 
+        {/* Progress */}
         {mode === "process" && total > 0 && (
-          <div className="h-1.5 w-full bg-line rounded-full overflow-hidden mb-4">
+          <div className="mb-7 h-[3px] w-full overflow-hidden bg-black/10">
             <div
-              className="h-full bg-indigo-600 rounded-full transition-all"
+              className="h-full bg-black transition-all"
               style={{ width: `${progressPct}%` }}
             />
           </div>
         )}
 
-        {/* Card */}
-        <div className="bg-white border border-line rounded-2xl shadow-sm p-5">
+        {/* =======================================================
+            EDITOR
+        ======================================================== */}
+        <div className="overflow-hidden border border-black/15 bg-white">
           {/* Voucher header */}
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-widest text-muted mb-0.5">
-                {mode === "edit" ? "Editing Voucher" : "Voucher"}
-              </p>
-              <h1 className="text-lg font-semibold text-ink truncate leading-tight">
-                {voucher.partyName}
-              </h1>
-              <p className="text-xs text-muted mt-0.5">
-                {voucher.voucherNumber}
-              </p>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="text-[10px] uppercase tracking-widest text-muted mb-0.5">
-                Amount
-              </p>
-              <p className="text-base font-semibold text-ink tabular-nums">
-                {formatCurrency(voucher.totalAmount)}
-              </p>
+          <div className="border-b border-black/15 px-5 py-5 sm:px-6">
+            <div className="flex items-start justify-between gap-5">
+              <div className="min-w-0">
+                <p className="mb-1 text-[9px] font-medium uppercase tracking-[0.18em] text-black/40">
+                  {mode === "edit" ? "Editing Voucher" : "Voucher"}
+                </p>
+
+                <h1 className="truncate text-[20px] font-medium tracking-[-0.035em]">
+                  {voucher.partyName}
+                </h1>
+
+                <p className="mt-1 font-mono text-[10px] text-black/40">
+                  {voucher.voucherNumber}
+                </p>
+              </div>
+
+              <div className="shrink-0 border-l border-black/10 pl-5 text-right">
+                <p className="mb-1 text-[9px] font-medium uppercase tracking-[0.18em] text-black/40">
+                  Amount
+                </p>
+
+                <p className="font-mono text-[14px] font-medium tabular-nums">
+                  {formatCurrency(voucher.totalAmount)}
+                </p>
+              </div>
             </div>
           </div>
 
+          {/* Error */}
           {error && (
-            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="border-b border-red-200 bg-red-50 px-5 py-3 text-[12px] text-red-700 sm:px-6">
               {error}
             </div>
           )}
 
-          {/* Live balance */}
-          <div
-            className={`mb-4 rounded-xl border px-4 py-3 flex items-center justify-between transition-colors ${balanceBoxClass}`}
-          >
-            <span
-              className={`flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide ${balanceTextClass}`}
+          {/* =====================================================
+              BALANCE
+          ====================================================== */}
+          <div className="px-5 pt-5 sm:px-6">
+            <div
+              className={`flex items-center justify-between border px-4 py-4 transition-colors ${balanceBoxClass}`}
             >
-              <BalanceIcon size={14} />
-              {balanceLabel}
-            </span>
-            <span
-              className={`text-lg font-bold tabular-nums ${balanceTextClass}`}
-            >
-              {formatCurrency(rawBalance)}
-            </span>
+              <span
+                className={`flex items-center gap-2 text-[9px] font-medium uppercase tracking-[0.16em] ${balanceTextClass}`}
+              >
+                <BalanceIcon size={14} />
+                {balanceLabel}
+              </span>
+
+              <span
+                className={`font-mono text-[18px] font-medium tabular-nums ${balanceTextClass}`}
+              >
+                {formatCurrency(rawBalance)}
+              </span>
+            </div>
           </div>
 
-          {/* Payment section */}
-          <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
-            <Banknote size={12} />
-            Payment
-          </div>
-          <div className="space-y-2.5 pb-4 mb-4 border-b border-line">
-            <NumberInput
-              ref={cashRef}
-              label="Cash"
-              value={form.cash}
-              onChange={(v) => setForm((f) => ({ ...f, cash: v }))}
-              onKeyDown={handleFieldKeyDown(addAmountRef, null)}
-            />
+          {/* =====================================================
+              PAYMENT
+          ====================================================== */}
+          <div className="px-5 pt-6 sm:px-6">
+            <div className="mb-3 flex items-center justify-between border-b border-black/10 pb-2">
+              <div className="flex items-center gap-2 text-[9px] font-medium uppercase tracking-[0.18em]">
+                <Banknote size={12} />
+                Payment
+              </div>
 
-            {form.banks.length > 0 && (
-              <div className="space-y-2">
-                {form.banks.map((b, i) => (
-                  <div key={b.bankName} className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <p className="text-[11px] text-muted mb-1">
-                        {b.bankName}
-                      </p>
-                      <NumberInput
-                        value={b.amount}
-                        onChange={(v) => updateBankAmount(i, v)}
-                        onKeyDown={handleFieldKeyDown(addAmountRef, cashRef)}
-                      />
+              <span className="font-mono text-[8px] text-black/30">01</span>
+            </div>
+
+            <div className="space-y-2.5 pb-5">
+              <NumberInput
+                ref={cashRef}
+                label="Cash"
+                value={form.cash}
+                onChange={(v) => setForm((f) => ({ ...f, cash: v }))}
+                onKeyDown={handleFieldKeyDown(addAmountRef, null)}
+              />
+
+              {form.banks.length > 0 && (
+                <div className="space-y-2">
+                  {form.banks.map((b, i) => (
+                    <div key={b.bankName} className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <p className="mb-1 text-[10px] text-black/45">
+                          {b.bankName}
+                        </p>
+
+                        <NumberInput
+                          value={b.amount}
+                          onChange={(v) => updateBankAmount(i, v)}
+                          onKeyDown={handleFieldKeyDown(addAmountRef, cashRef)}
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => removeBank(i)}
+                        aria-label={`Remove ${b.bankName} from this voucher`}
+                        title={`Remove ${b.bankName} from this voucher`}
+                        className="
+                          mb-2.5
+                          text-black/30
+                          transition-colors
+                          hover:text-red-700
+                        "
+                      >
+                        <X size={16} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => removeBank(i)}
-                      aria-label={`Remove ${b.bankName} from this voucher`}
-                      title={`Remove ${b.bankName} from this voucher`}
-                      className="mb-2.5 text-muted hover:text-red-700 transition-colors"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
 
-            <div className="flex items-end gap-2">
-              <div className="w-24 shrink-0">
-                <NumberInput
-                  ref={addAmountRef}
-                  label="+ Bank"
-                  value={addAmount}
-                  onChange={setAddAmount}
-                  onKeyDown={handleFieldKeyDown(addBankNameRef, cashRef)}
-                  placeholder="Amount"
-                />
-              </div>
-              <div className="flex-1">
-                <BankCombobox
-                  ref={addBankNameRef}
-                  banks={banks}
-                  onCommit={handleBankCommit}
-                  onDeleteBank={handleRequestDeleteBank}
-                  onBackspaceEmpty={() => addAmountRef.current?.focus()}
-                />
+              <div className="flex items-end gap-2 border-t border-dashed border-black/10 pt-2">
+                <div className="w-24 shrink-0">
+                  <NumberInput
+                    ref={addAmountRef}
+                    label="+ Bank"
+                    value={addAmount}
+                    onChange={setAddAmount}
+                    onKeyDown={handleFieldKeyDown(addBankNameRef, cashRef)}
+                    placeholder="Amount"
+                  />
+                </div>
+
+                <div className="flex-1">
+                  <BankCombobox
+                    ref={addBankNameRef}
+                    banks={banks}
+                    onCommit={handleBankCommit}
+                    onDeleteBank={handleRequestDeleteBank}
+                    onBackspaceEmpty={() => addAmountRef.current?.focus()}
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Adjustments section */}
-          <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
-            <Percent size={12} />
-            Adjustments
-          </div>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <NumberInput
-              ref={discountRef}
-              label="Discount"
-              value={form.discount}
-              onChange={(v) => setForm((f) => ({ ...f, discount: v }))}
-              onKeyDown={handleFieldKeyDown(goodsReturnRef, addBankNameRef)}
-            />
-            <NumberInput
-              ref={goodsReturnRef}
-              label="Goods Return"
-              value={form.goodsReturn}
-              onChange={(v) => setForm((f) => ({ ...f, goodsReturn: v }))}
-              onKeyDown={handleGoodsReturnKeyDown}
-            />
+          {/* =====================================================
+              ADJUSTMENTS
+          ====================================================== */}
+          <div className="px-5 sm:px-6">
+            <div className="mb-3 flex items-center justify-between border-b border-black/10 pb-2">
+              <div className="flex items-center gap-2 text-[9px] font-medium uppercase tracking-[0.18em]">
+                <Percent size={12} />
+                Adjustments
+              </div>
+
+              <span className="font-mono text-[8px] text-black/30">02</span>
+            </div>
+
+            <div className="mb-5 grid grid-cols-2 gap-3">
+              <NumberInput
+                ref={discountRef}
+                label="Discount"
+                value={form.discount}
+                onChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    discount: v,
+                  }))
+                }
+                onKeyDown={handleFieldKeyDown(goodsReturnRef, addBankNameRef)}
+              />
+
+              <NumberInput
+                ref={goodsReturnRef}
+                label="Goods Return"
+                value={form.goodsReturn}
+                onChange={(v) =>
+                  setForm((f) => ({
+                    ...f,
+                    goodsReturn: v,
+                  }))
+                }
+                onKeyDown={handleGoodsReturnKeyDown}
+              />
+            </div>
+
+            <div className="mb-5 flex items-center justify-between border-t border-black/10 pt-3 text-[10px]">
+              <span className="uppercase tracking-[0.12em] text-black/40">
+                Paid so far
+              </span>
+
+              <span className="font-mono font-medium tabular-nums">
+                {formatCurrency(paidTotal)}
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-muted mb-4">
-            <span>Paid so far</span>
-            <span className="font-medium text-ink tabular-nums">
-              {formatCurrency(paidTotal)}
-            </span>
-          </div>
+          {/* =====================================================
+              ACTIONS
+          ====================================================== */}
+          <div className="border-t border-black/15 bg-[#f3f0e8] px-5 py-4 sm:px-6">
+            <div className="flex items-center gap-3">
+              {mode === "process" ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    onClick={onPrevious}
+                    disabled={index === 0 || saving}
+                  >
+                    Previous
+                  </Button>
 
-          {/* Actions */}
-          <div className="flex items-center gap-3">
-            {mode === "process" ? (
-              <>
-                <Button
-                  variant="secondary"
-                  onClick={onPrevious}
-                  disabled={index === 0 || saving}
-                >
-                  Previous
-                </Button>
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex-1"
+                  >
+                    {saving ? "Saving..." : "Save & Next →"}
+                  </Button>
+                </>
+              ) : (
                 <Button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1"
+                  className="w-full"
                 >
-                  {saving ? "Saving..." : "Save & Next"}
+                  {saving ? "Saving..." : "Save Changes"}
                 </Button>
-              </>
-            ) : (
-              <Button onClick={handleSave} disabled={saving} className="w-full">
-                {saving ? "Saving..." : "Save Changes"}
-              </Button>
-            )}
+              )}
+            </div>
+
+            <button
+              onClick={handleMarkOutstanding}
+              disabled={saving || outstanding <= 0}
+              className="
+                mt-3
+                flex
+                w-full
+                items-center
+                justify-center
+                gap-2
+                py-2
+                text-[9px]
+                font-medium
+                uppercase
+                tracking-[0.15em]
+                text-amber-700
+                transition-colors
+                hover:bg-[#fffbdc]
+                hover:text-amber-900
+                disabled:cursor-not-allowed
+                disabled:opacity-40
+              "
+            >
+              <AlertTriangle size={13} />
+              Mark Outstanding ({formatCurrency(outstanding)}) · press "o"
+            </button>
           </div>
-
-          <button
-            onClick={handleMarkOutstanding}
-            disabled={saving || outstanding <= 0}
-            className="w-full mt-2 flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-medium uppercase tracking-wide text-amber-700 hover:text-amber-900 hover:bg-amber-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <AlertTriangle size={14} />
-            Mark Outstanding ({formatCurrency(outstanding)}) &middot; press
-            &ldquo;o&rdquo;
-          </button>
         </div>
-      </div>
 
+        {/* Small footer */}
+        <div className="mt-5 flex items-center justify-between text-[8px] font-medium uppercase tracking-[0.16em] text-black/35">
+          <span>Payment Tracker</span>
+
+          <span>
+            {mode === "process" ? "Sequential entry" : "Editing mode"}
+          </span>
+        </div>
+      </main>
+
+      {/* =========================================================
+          DELETE BANK MODAL
+      ========================================================== */}
       <ConfirmModal
         open={!!bankPendingDelete}
         onClose={() => setBankPendingDelete(null)}
