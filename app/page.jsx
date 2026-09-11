@@ -9,6 +9,7 @@ import AddMoreVouchers from "@/components/vouchers/AddMoreVouchers";
 import ImportPreview from "@/components/vouchers/ImportPreview";
 import VoucherList from "@/components/vouchers/VoucherList";
 import VoucherEditor from "@/components/vouchers/VoucherEditor";
+import EditVoucherDetailsModal from "@/components/vouchers/EditVoucherDetailsModal";
 import Report from "@/components/report/Report";
 import OutstandingPage from "@/components/report/OutstandingPage";
 import ExpenseList from "@/components/expenses/ExpenseList";
@@ -39,6 +40,12 @@ export default function Home() {
   const [resetting, setResetting] = useState(false);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
+
+  // Editing a voucher's own details (number/party/amount) - separate
+  // from the payment editor entirely, see EditVoucherDetailsModal.
+  const [editingDetailsVoucher, setEditingDetailsVoucher] = useState(null);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
 
   // ---- Bootstrap: resume an active batch if one exists ----
   useEffect(() => {
@@ -191,11 +198,15 @@ export default function Home() {
     }
   };
 
+  const handlePreviousProcessing = () => {
+    setError("");
+    setProcessingIndex((i) => Math.max(0, i - 1));
+  };
+
   // ---- Report ----
   const refreshReport = async () => {
     await loadReport(batch._id);
   };
-
   // Lets the user jump to the report at any point, even with some
   // vouchers still unprocessed - it's just a live snapshot of whatever
   // is in MongoDB right now, same calculation as the "final" report.
@@ -271,6 +282,38 @@ export default function Home() {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ---- Edit a voucher's own details (number/party/amount) ----
+  const openEditDetails = (voucher) => {
+    setDetailsError("");
+    setEditingDetailsVoucher(voucher);
+  };
+
+  const handleSaveDetails = async (data) => {
+    if (!editingDetailsVoucher) return;
+    setSavingDetails(true);
+    setDetailsError("");
+    try {
+      const payload = {
+        voucherNumber: data.voucherNumber,
+        partyName: data.partyName,
+      };
+      if (
+        Number(data.totalAmount) !== Number(editingDetailsVoucher.totalAmount)
+      ) {
+        payload.allowTotalAmountEdit = true;
+        payload.totalAmount = data.totalAmount;
+      }
+      await api.updateVoucher(batch._id, editingDetailsVoucher._id, payload);
+      await refreshVouchers();
+      await refreshReport();
+      setEditingDetailsVoucher(null);
+    } catch (err) {
+      setDetailsError(err.message);
+    } finally {
+      setSavingDetails(false);
     }
   };
 
@@ -503,6 +546,7 @@ export default function Home() {
         <VoucherList
           vouchers={vouchers}
           onOpenVoucher={openVoucherForProcessing}
+          onEditVoucher={openEditDetails}
           onBack={() => setView("home")}
           backLabel="Home"
           title="Vouchers"
@@ -557,6 +601,7 @@ export default function Home() {
         <VoucherList
           vouchers={vouchers}
           onOpenVoucher={openVoucherForEdit}
+          onEditVoucher={openEditDetails}
           onBack={() => setView("report")}
           backLabel="Report"
           title="All Vouchers"
@@ -621,6 +666,14 @@ export default function Home() {
         This permanently removes every voucher in today&rsquo;s workspace. This
         cannot be undone.
       </ConfirmModal>
+
+      <EditVoucherDetailsModal
+        voucher={editingDetailsVoucher}
+        onClose={() => setEditingDetailsVoucher(null)}
+        onSave={handleSaveDetails}
+        saving={savingDetails}
+        error={detailsError}
+      />
     </>
   );
 }

@@ -83,6 +83,7 @@ function SelectField({ value, onChange, options }) {
 export default function VoucherList({
   vouchers,
   onOpenVoucher,
+  onEditVoucher,
   onBack,
   backLabel = "Back",
   title = "Vouchers",
@@ -309,6 +310,7 @@ export default function VoucherList({
                     <VoucherRow
                       voucher={v}
                       onOpen={onOpenVoucher}
+                      onEdit={onEditVoucher}
                       showStatus={showStatus}
                     />
                   </div>
