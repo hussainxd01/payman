@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import Textarea from "@/components/ui/Textarea";
 
@@ -12,6 +12,244 @@ export default function PasteVoucher({
 }) {
   const [text, setText] = useState("");
   const [parsing, setParsing] = useState(false);
+
+  const gameRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = gameRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animationFrame;
+    let lastTime = performance.now();
+    let score = 0;
+    let spawnTimer = 0;
+    let groundOffset = 0;
+    let running = true;
+
+    const dino = {
+      x: 44,
+      y: 0,
+      width: 34,
+      height: 38,
+      velocityY: 0,
+      jumping: false,
+    };
+
+    const obstacles = [];
+
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      dino.y = rect.height - dino.height - 20;
+    };
+
+    const jump = () => {
+      if (!dino.jumping) {
+        dino.velocityY = -520;
+        dino.jumping = true;
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      const tag = event.target?.tagName?.toLowerCase();
+
+      // Don't hijack typing inside the voucher textarea.
+      if (tag === "textarea" || tag === "input") return;
+
+      if (event.code === "Space" || event.code === "ArrowUp") {
+        event.preventDefault();
+        jump();
+      }
+    };
+
+    const drawDino = (x, y) => {
+      ctx.save();
+      ctx.translate(Math.round(x), Math.round(y));
+
+      ctx.fillStyle = "#111";
+
+      // Head
+      ctx.fillRect(12, 0, 16, 5);
+      ctx.fillRect(7, 5, 23, 7);
+
+      // Body
+      ctx.fillRect(4, 12, 29, 14);
+      ctx.fillRect(9, 26, 20, 7);
+
+      // Tail
+      ctx.fillRect(0, 17, 8, 6);
+      ctx.fillRect(26, 18, 9, 5);
+
+      // Legs
+      const frame = Math.floor(score / 4) % 2;
+
+      if (dino.jumping) {
+        ctx.fillRect(10, 32, 6, 6);
+        ctx.fillRect(24, 31, 6, 5);
+      } else if (frame === 0) {
+        ctx.fillRect(10, 32, 5, 7);
+        ctx.fillRect(24, 33, 5, 6);
+      } else {
+        ctx.fillRect(12, 33, 5, 6);
+        ctx.fillRect(22, 31, 5, 7);
+      }
+
+      // Eye
+      ctx.fillStyle = "#fff06a";
+      ctx.fillRect(24, 6, 3, 3);
+
+      ctx.restore();
+    };
+
+    const drawCactus = (obstacle) => {
+      ctx.save();
+      ctx.translate(Math.round(obstacle.x), Math.round(obstacle.y));
+
+      ctx.fillStyle = "#111";
+
+      ctx.fillRect(8, 0, 8, 32);
+      ctx.fillRect(2, 8, 7, 7);
+      ctx.fillRect(0, 10, 7, 4);
+      ctx.fillRect(15, 12, 7, 7);
+      ctx.fillRect(18, 9, 4, 7);
+
+      ctx.restore();
+    };
+
+    const reset = (height) => {
+      obstacles.length = 0;
+      score = 0;
+      spawnTimer = 0;
+      dino.velocityY = 0;
+      dino.jumping = false;
+      dino.y = height - dino.height - 20;
+    };
+
+    const loop = (now) => {
+      if (!running) return;
+
+      const dt = Math.min((now - lastTime) / 1000, 0.035);
+      lastTime = now;
+
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Keep it subtle — it's an easter egg behind the typography.
+      ctx.globalAlpha = 0.16;
+
+      const groundY = height - 20;
+
+      // Ground line
+      ctx.fillStyle = "#111";
+      ctx.fillRect(0, groundY, width, 2);
+
+      // Little moving ground marks
+      groundOffset = (groundOffset + 120 * dt) % 32;
+
+      for (let x = -32 + groundOffset; x < width; x += 32) {
+        ctx.fillRect(x, groundY + 7, 14, 1);
+      }
+
+      // Dino physics
+      dino.velocityY += 1450 * dt;
+      dino.y += dino.velocityY * dt;
+
+      const floorY = groundY - dino.height;
+
+      if (dino.y >= floorY) {
+        dino.y = floorY;
+        dino.velocityY = 0;
+        dino.jumping = false;
+      }
+
+      // Spawn cactus
+      spawnTimer -= dt;
+
+      if (spawnTimer <= 0) {
+        obstacles.push({
+          x: width + 20,
+          y: groundY - 32,
+          width: 22,
+          height: 32,
+          speed: 250 + Math.min(score * 1.2, 90),
+        });
+
+        spawnTimer = 1.25 + Math.random() * 1.1;
+      }
+
+      // Move obstacles
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obstacle = obstacles[i];
+
+        obstacle.x -= obstacle.speed * dt;
+
+        if (obstacle.x + obstacle.width < 0) {
+          obstacles.splice(i, 1);
+          score += 1;
+          continue;
+        }
+
+        drawCactus(obstacle);
+      }
+
+      // Collision
+      const dx = dino.x + 6;
+      const dy = dino.y + 5;
+      const dw = dino.width - 8;
+      const dh = dino.height - 5;
+
+      const hit = obstacles.some(
+        (o) =>
+          dx < o.x + o.width - 3 &&
+          dx + dw > o.x + 3 &&
+          dy < o.y + o.height &&
+          dy + dh > o.y + 3,
+      );
+
+      if (hit) {
+        reset(height);
+      }
+
+      drawDino(dino.x, dino.y);
+
+      ctx.globalAlpha = 1;
+
+      animationFrame = requestAnimationFrame(loop);
+    };
+
+    const observer = new ResizeObserver(resize);
+
+    observer.observe(canvas);
+    resize();
+    reset(canvas.clientHeight);
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    // Tap/click the yellow hero to jump.
+    canvas.addEventListener("pointerdown", jump);
+
+    animationFrame = requestAnimationFrame(loop);
+
+    return () => {
+      running = false;
+      cancelAnimationFrame(animationFrame);
+      observer.disconnect();
+
+      window.removeEventListener("keydown", handleKeyDown);
+      canvas.removeEventListener("pointerdown", jump);
+    };
+  }, []);
 
   const handleParse = async () => {
     if (!text.trim()) return;
@@ -81,7 +319,15 @@ export default function PasteVoucher({
             }}
           />
 
-          <div className="relative grid min-h-[330px] lg:grid-cols-[1fr_280px]">
+          {/* =========================================================
+    HIDDEN DINO EASTER EGG
+========================================================= */}
+          <canvas
+            ref={gameRef}
+            aria-hidden="true"
+            className="absolute inset-0 z-0 h-full w-full"
+          />
+          <div className="relative z-10 grid min-h-[330px] lg:grid-cols-[1fr_280px]">
             {/* Hero copy */}
             <div className="flex flex-col justify-between p-7 sm:p-10 lg:p-12">
               <div>
