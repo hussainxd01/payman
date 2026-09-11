@@ -257,10 +257,6 @@ export default function Home() {
     const updated = await refreshVouchers();
     const full =
       updated.find((v) => v._id === voucherSummary._id) || voucherSummary;
-    if (!full.isProcessed) {
-      openVoucherForProcessing(full);
-      return;
-    }
     setEditingVoucher({ ...full, _editReturnView: "outstanding" });
     setError("");
     setView("edit-voucher");
